@@ -1,4 +1,5 @@
 from collections import defaultdict, Counter
+import time
 from typing import Dict, List, Tuple, Set
 
 
@@ -18,13 +19,13 @@ class BytePairEncodingTokenizer:
     """
 
     def __init__(self):
-        self.word_frequencies: Dict[str, int] = Counter()
+        self.word_frequencies: Counter[str] = Counter()
         self.vocabulary: Set[str] = set()
-        self.tokens: Dict[str, List[str]] = {}
+        self.words_to_tokens: Dict[str, List[str]] = {}
         self.merge_rules: Dict[Tuple[str, str], str] = {}
         self.SPACE_SYMBOL = "Ġ"
 
-    def pre_tokenize(self, corpus: List[str]) -> Dict[str, int]:
+    def pre_tokenize(self, corpus: List[str]) -> Counter[str]:
         """
         Updates the word frequencies with counts for each word in the corpus.
         Each word that is not the first word in a line is prefixed with a space
@@ -37,7 +38,7 @@ class BytePairEncodingTokenizer:
 
         assert corpus, "😳 Corpus must be non-empty"
 
-        word_frequencies: Dict[str, int] = Counter()
+        word_frequencies: Counter[str] = Counter()
         for line in corpus:
             words = line.split()
             # Increment the count for the first word in the line without a space
@@ -47,10 +48,10 @@ class BytePairEncodingTokenizer:
 
         return word_frequencies
 
-    def build_base_vocabulary(self) -> None:
+    def build_vocabulary(self) -> None:
         """
         Builds the base vocabulary from the word frequencies. The base vocabulary
-        is a dictionary mapping each character in the corpus to its frequency.
+        is a set containing all the characters used in the corpus.
         """
 
         assert (
@@ -85,7 +86,7 @@ class BytePairEncodingTokenizer:
 
         for word, frequency in self.word_frequencies.items():
             # Get the tokens in the word
-            tokens_in_word = self.tokens[word]
+            tokens_in_word = self.words_to_tokens[word]
 
             # If the word itself is a token, skip it as it cannot be adjacent
             # to any other tokens in the corpus. This is because the word itself
@@ -116,7 +117,7 @@ class BytePairEncodingTokenizer:
         """
 
         assert self.vocabulary, "😳 Vocabulary must be initialized"
-        assert self.tokens, "😳 Tokens must be initialized"
+        assert self.words_to_tokens, "😳 Tokens must be initialized"
 
         # Get the two tokens to merge
         token_1, token_2 = pair
@@ -125,7 +126,7 @@ class BytePairEncodingTokenizer:
         merged_token = token_1 + token_2
 
         # Update the tokens dictionary to reflect the merged token
-        for word, tokens_in_word in self.tokens.items():
+        for word, tokens_in_word in self.words_to_tokens.items():
             # If the word itself is a token, skip it as it cannot possibly
             # contain the two tokens to merge.
             if len(tokens_in_word) == 1:
@@ -143,7 +144,7 @@ class BytePairEncodingTokenizer:
                     i += 1
 
             # Update the tokens dictionary with the new tokens in the word
-            self.tokens[word] = tokens_in_word
+            self.words_to_tokens[word] = tokens_in_word
 
         # Update the merge rules to reflect the merged token
         self.merge_rules[pair] = merged_token
@@ -163,28 +164,34 @@ class BytePairEncodingTokenizer:
 
         # Pre-tokenize the corpus to get the word frequencies
         self.word_frequencies = self.pre_tokenize(corpus)
-        # Initialize the vocabulary with all the characters used in the corpus
-        self.build_base_vocabulary()
-        # Split each word into individual characters to start the training process
-        self.tokens = {word: list(word) for word in self.word_frequencies.keys()}
 
+        # Initialize the vocabulary with all the characters used in the corpus
+        self.build_vocabulary()
+
+        # Split each word into individual characters to start the training process
+        self.words_to_tokens = {
+            word: list(word) for word in self.word_frequencies.keys()
+        }
+
+        # Compute the frequencies of adjacent token pairs in the vocabulary
         pair_frequencies = self.compute_pair_frequencies()
+        # Get the most frequent pair of tokens in the corpus
         most_frequent_pair = max(pair_frequencies, key=pair_frequencies.get)
+
         while pair_frequencies[most_frequent_pair] > 2:
             # Merge the most frequent pair of tokens in the corpus
             self.merge_tokens(most_frequent_pair)
+
             # Recompute the pair frequencies
             pair_frequencies = self.compute_pair_frequencies()
             # Get the most frequent pair of tokens in the corpus
             most_frequent_pair = max(pair_frequencies, key=pair_frequencies.get)
 
-            print(most_frequent_pair)
-
-        print(most_frequent_pair)
-
     def tokenize(self, text: str) -> List[str]:
         """
-        Tokenizes the given text using the trained tokenizer.
+        Tokenizes the given text using the trained tokenizer. For Byte-Pair
+        Encoding, this involves splitting each word in the text into individual
+        tokens, and then merging the most common pair of tokens in the corpus.
 
         Args:
             text: The text to tokenize.
@@ -194,12 +201,14 @@ class BytePairEncodingTokenizer:
         """
 
         assert self.vocabulary, "😳 Vocabulary must be initialized"
-        assert self.tokens, "😳 Tokens must be initialized"
+        assert self.words_to_tokens, "😳 Tokens must be initialized"
 
         # Pre-tokenize the text to get the word frequencies
         word_frequencies = self.pre_tokenize([text])
+        # Get the words themselves
+        words = list(word_frequencies.keys())
         # Split each word into individual characters
-        tokens = [list(word) for word in word_frequencies.keys()]
+        tokens = [list(word) for word in words]
 
         # Merge tokens until we can't merge them anymore
         for (token_1, token_2), merged_token in self.merge_rules.items():
@@ -237,6 +246,13 @@ if __name__ == "__main__":
     tokenizer = BytePairEncodingTokenizer()
     tokenizer.train(training_data)
 
+    # Print the number of tokens in the vocabulary
+    print(f"Number of tokens in the vocabulary: {len(tokenizer.vocabulary)}")
+
     # Tokenize the test data
-    for line in test_data:
-        print(tokenizer.tokenize(line))
+    tokenized_test_data = [tokenizer.tokenize(line) for line in test_data]
+
+    # Print the first 10 lines of the test data
+    print("\nFirst 10 lines of the test data:")
+    for line in tokenized_test_data[:10]:
+        print(line)
