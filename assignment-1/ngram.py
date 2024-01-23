@@ -259,7 +259,6 @@ class NGramModel:
         processed_sentence: List[str],
         unigram_model: "NGramModel",
         bigram_model: "NGramModel",
-        use_laplace_smoothing=False,
     ) -> float:
         assert self.n == 3, "😳 We can only use interpolation with trigram models."
         assert self.lambdas, "😳 We need to specify lambda values to use interpolation."
@@ -267,17 +266,13 @@ class NGramModel:
         sentence_probability_log_sum = 0.0
         for ngram in self.ngrams(processed_sentence):
             # Calculate the probability of the n-gram under the trigram model.
-            trigram_probability = self.ngram_probability(ngram, use_laplace_smoothing)
+            trigram_probability = self.ngram_probability(ngram)
 
             # Calculate the probability of the n-gram under the bigram model.
-            bigram_probability = bigram_model.ngram_probability(
-                ngram[-2:], use_laplace_smoothing
-            )
+            bigram_probability = bigram_model.ngram_probability(ngram[-2:])
 
             # Calculate the probability of the n-gram under the unigram model.
-            unigram_probability = unigram_model.ngram_probability(
-                ngram[-1], use_laplace_smoothing
-            )
+            unigram_probability = unigram_model.ngram_probability(ngram[-1:])
 
             # Calculate the interpolated probability of the n-gram.
             interpolated_probability = (
@@ -300,7 +295,6 @@ class NGramModel:
         data: List[str],
         unigram_model: "NGramModel",
         bigram_model: "NGramModel",
-        use_laplace_smoothing=False,
     ) -> float:
         assert self.n == 3, "😳 We can only use interpolation with trigram models."
 
@@ -310,7 +304,7 @@ class NGramModel:
         token_count = 0
         for sentence in processed_data:
             log_probability = self.sentence_log_probability_with_interpolation(
-                sentence, unigram_model, bigram_model, use_laplace_smoothing
+                sentence, unigram_model, bigram_model
             )
 
             if log_probability == float("-inf"):
@@ -331,7 +325,9 @@ on the training, dev, and test data.
 # Evaluates the trigram model with interpolation on the given dataset. Prints
 # the perplexity of the model on the dataset for all possible lambda values.
 # NOTE: This function only works with trigram models.
-def evaluate_trigram_model_with_interpolation(data: List[str], data_name: str) -> None:
+def evaluate_trigram_model_with_interpolation(
+    data: List[str], data_name: str, unigram_model: NGramModel, bigram_model: NGramModel
+) -> None:
     print(
         f"Running grid search to find best lambda values for interpolation on {data_name} set..."
     )
@@ -351,7 +347,7 @@ def evaluate_trigram_model_with_interpolation(data: List[str], data_name: str) -
             model = NGramModel(3, lambdas=(lambda_1, lambda_2, lambda_3))
             model.train(training_data)
             perplexity = model.perplexity_with_interpolation(
-                data, unigram_model, bigram_model, use_laplace_smoothing=True
+                data, unigram_model, bigram_model
             )
 
             print(f"Perplexity: {perplexity}")
@@ -373,9 +369,6 @@ def evaluate_model(model: NGramModel, data: List[str], data_name: str) -> None:
     print(
         f"Laplace smoothing (k={model.smoothing_constant}):\t{model.perplexity(data, use_laplace_smoothing=True)}"
     )
-    if model.n == 3:
-        evaluate_trigram_model_with_interpolation(data, data_name)
-
     print()
 
 
@@ -411,3 +404,8 @@ if __name__ == "__main__":
     evaluate_model(unigram_model, test_data, "test")
     evaluate_model(bigram_model, test_data, "test")
     evaluate_model(trigram_model, test_data, "test")
+
+    # Evaluate the trigram model with interpolation on the dev data
+    evaluate_trigram_model_with_interpolation(
+        dev_data, "dev", unigram_model, bigram_model
+    )
