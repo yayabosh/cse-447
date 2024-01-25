@@ -1,16 +1,6 @@
 from collections import defaultdict, Counter
-import time
 from typing import Dict, List, Tuple, Set
-
-
-def load_data(file_path: str) -> List[str]:
-    """
-    Loads the data from the specified file path and returns a list of lines from
-    the file, stripped of whitespace.
-    """
-
-    with open(file_path) as f:
-        return [line.strip() for line in f]
+from ngram import load_data
 
 
 class BytePairEncodingTokenizer:
@@ -168,6 +158,9 @@ class BytePairEncodingTokenizer:
         # Initialize the vocabulary with all the characters used in the corpus
         self.build_vocabulary()
 
+        # Print the size of the initial vocabulary
+        print(f"Initial vocabulary size: {len(self.vocabulary)}")
+
         # Split each word into individual characters to start the training process
         self.words_to_tokens = {
             word: list(word) for word in self.word_frequencies.keys()
@@ -247,12 +240,20 @@ if __name__ == "__main__":
     tokenizer.train(training_data)
 
     # Print the number of tokens in the vocabulary
-    print(f"Number of tokens in the vocabulary: {len(tokenizer.vocabulary)}")
+    print(f"Vocabulary size after training: {len(tokenizer.vocabulary)}")
+
+    # Tokenize the training data
+    tokenized_training_data = [tokenizer.tokenize(line) for line in training_data]
+
+    # Print the number of tokens in the training data
+    print(
+        f"Number of tokens in training data: {sum(len(tokens) for tokens in tokenized_training_data)}"
+    )
 
     # Tokenize the test data
     tokenized_test_data = [tokenizer.tokenize(line) for line in test_data]
 
-    # Print the first 10 lines of the test data
-    print("\nFirst 10 lines of the test data:")
-    for line in tokenized_test_data[:10]:
-        print(line)
+    # Print the number of tokens in the test data
+    print(
+        f"Number of tokens in test data: {sum(len(tokens) for tokens in tokenized_test_data)}"
+    )
