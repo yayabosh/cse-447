@@ -1,63 +1,15 @@
 from collections import Counter
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Tuple
+from bpe import BytePairEncodingTokenizer, load_data
 
 
-def load_data(file_path: str) -> List[str]:
-    """
-    Loads the data from the specified file path and returns a list of lines from
-    the file, stripped of whitespace.
-    """
-
-    with open(file_path) as f:
-        return [line.strip() for line in f]
-
-
-class WordPieceTokenizer:
+class WordPieceTokenizer(BytePairEncodingTokenizer):
     """
     A tokenizer that uses the WordPiece algorithm to tokenize text.
     """
 
     def __init__(self):
-        self.word_frequencies: Counter[str] = Counter()
-        self.vocabulary: Set[str] = set()
-        self.words_to_tokens: Dict[str, List[str]] = {}
-        self.merge_rules: Dict[Tuple[str, str], str] = {}
-        self.PREFIX_SYMBOL = "##"
-
-    def pre_tokenize(self, corpus: List[str]) -> Counter[str]:
-        """
-        Updates the word frequencies with counts for each word in the corpus.
-
-        Returns:
-            A Counter containing the word frequencies in the corpus.
-        """
-
-        assert corpus, "😳 Corpus must be non-empty"
-
-        word_frequencies: Counter[str] = Counter()
-        for line in corpus:
-            word_frequencies.update(line.split())
-
-        return word_frequencies
-
-    def build_vocabulary(self) -> None:
-        """
-        Builds the base vocabulary from the word frequencies. The base vocabulary
-        is a set containing all the characters used in the corpus, and we add
-        a special prefix symbol (##) to each character that is not the start of
-        a word.
-        """
-
-        assert (
-            self.word_frequencies
-        ), "😳 Word frequencies must be initialized before building the vocabulary"
-        assert not self.vocabulary, "😳 Vocabulary must be empty before building it"
-
-        for word in self.word_frequencies:
-            self.vocabulary.add(word[0])
-
-            for char in word[1:]:
-                self.vocabulary.add(self.PREFIX_SYMBOL + char)
+        super().__init__()
 
     def compute_pair_scores(self) -> Dict[Tuple[str, str], float]:
         """
@@ -106,85 +58,31 @@ class WordPieceTokenizer:
 
         return pair_scores
 
-    def merge_tokens(self, pair: Tuple[str, str]) -> None:
-        """
-        Merge the pair of tokens into a single token. The new token is the
-        concatenation of the two tokens in the pair, and the merge rule is
-        stored in the merge rules dictionary.
-
-        For example, if the two tokens were "##a" and "##b", the new token would
-        be "##ab", and the merge rule would be ("##a", "##b") -> "##ab". If the
-        two tokens were "h" and "##u", the new token would be "hu", and the merge
-        rule would be ("h", "##u") -> "hu".
-        """
-
-        assert pair, "😳 Pair must be non-empty"
-
-        # Get the two tokens to merge
-        token1, token2 = pair
-
-        # Merge the two tokens into a single token
-        if token2.startswith(self.PREFIX_SYMBOL):
-            # If the second token is a prefix token, we need to remove the prefix
-            # symbol from the second token before merging
-            merged_token = token1 + token2[len(self.PREFIX_SYMBOL) :]
-        else:
-            merged_token = token1 + token2
-
-        print(pair, "->", merged_token)
-
-        for word, tokens_in_word in self.words_to_tokens.items():
-            # If the word itself is a single token, it cannot possibly contain
-            # the pair of tokens we are trying to merge. Just continue.
-            if len(tokens_in_word) == 1:
-                continue
-
-            i = 0
-            while i < len(tokens_in_word) - 1:
-                if tokens_in_word[i] == token1 and tokens_in_word[i + 1] == token2:
-                    tokens_in_word = (
-                        tokens_in_word[:i] + [merged_token] + tokens_in_word[i + 2 :]
-                    )
-                else:
-                    i += 1
-
-            self.words_to_tokens[word] = tokens_in_word
-
-        # Add the merge rule to the merge rules dictionary
-        self.merge_rules[pair] = merged_token
-
-        # Update the vocabulary
-        self.vocabulary.add(merged_token)
-
     def train(self, corpus: List[str]) -> None:
         # Pre-tokenize the corpus to get the word frequencies
-        self.word_frequencies = self.pre_tokenize(corpus)
+        self.word_frequencies = super().pre_tokenize(corpus)
 
         # Build the base vocabulary
-        self.build_vocabulary()
+        super().build_vocabulary()
 
         # Split each word into individual characters to start the training process
         self.words_to_tokens = {
-            word: [
-                char if i == 0 else self.PREFIX_SYMBOL + char
-                for i, char in enumerate(word)
-            ]
-            for word in self.word_frequencies.keys()
+            word: list(word) for word in self.word_frequencies.keys()
         }
 
         # Merge the most frequent pair of adjacent tokens in the vocabulary
-        # until we have learned 4000 merge rules (i.e. the vocabulary has size
-        # 4000 excluding the base vocabulary)
-        # while len(self.merge_rules) < 4000:
-        while len(self.vocabulary) < 70:
+        # until we have learned 4000 merge rules
+        while len(self.merge_rules) < 4000:
             # Compute the scores for each pair of adjacent tokens in the vocabulary
             pair_scores = self.compute_pair_scores()
 
             # Get the pair with the highest score
             best_pair = max(pair_scores, key=pair_scores.get)
 
+            print(f"Merging pair: {best_pair}")
+
             # Merge the pair
-            self.merge_tokens(best_pair)
+            super().merge_tokens(best_pair)
 
     def tokenize_word(self, word: str) -> List[str]:
         """
@@ -229,8 +127,8 @@ class WordPieceTokenizer:
             # This is because the remaining parts of the word are not the
             # beginning of a word, so we need to add the prefix symbol to
             # correctly tokenize them.
-            if len(word) > 0:
-                word = self.PREFIX_SYMBOL + word
+            # if len(word) > 0:
+            #     word = self.SPACE_SYMBOL + word
 
         return tokens
 
@@ -251,7 +149,7 @@ class WordPieceTokenizer:
         assert self.vocabulary, "😳 Vocabulary must be initialized"
 
         # Pre-tokenize the text to get the word frequencies
-        word_frequencies = self.pre_tokenize([text])
+        word_frequencies = super().pre_tokenize([text])
         # Get the words themselves
         words = list(word_frequencies.keys())
 
@@ -262,21 +160,6 @@ class WordPieceTokenizer:
 
 
 if __name__ == "__main__":
-    DEBUG = True
-    if DEBUG:
-        corpus = load_data("test.txt")
-
-        tokenizer = WordPieceTokenizer()
-        tokenizer.train(corpus)
-
-        print(tokenizer.vocabulary)
-
-        print(tokenizer.tokenize("Hugging"))
-        print(tokenizer.tokenize("HOgging"))
-        print(tokenizer.tokenize("This is the Hugging Face course!"))
-
-        exit()
-
     corpus = load_data("BPE-data.txt")
 
     # Split the corpus into training and test data
@@ -288,17 +171,31 @@ if __name__ == "__main__":
 
     print(f"Vocabulary size: {len(tokenizer.vocabulary)}")
 
+    # Tokenize the training data
+    tokenized_training_data = [tokenizer.tokenize(line) for line in training_data]
+
+    # Print the number of tokens in the training data
+    print(
+        f"Number of tokens in training data: {sum(len(tokens) for tokens in tokenized_training_data)}"
+    )
+
     # Tokenize the test data
     tokenized_test_data = [tokenizer.tokenize(line) for line in test_data]
-    for line, tokens in zip(test_data, tokenized_test_data)[:10]:
-        print(line)
-        print(tokens)
-        print()
-    
+
+    # Print the number of tokens in the test data
+    print(
+        f"Number of tokens in test data: {sum(len(tokens) for tokens in tokenized_test_data)}"
+    )
+
+    print("Analysts were expecting the opposite, a deepening of the deficit.")
     print(
         tokenizer.tokenize(
             "Analysts were expecting the opposite, a deepening of the deficit."
         )
+    )
+
+    print(
+        "Five minutes later, a second person arrived, aged around thirty, with knife wounds."
     )
     print(
         tokenizer.tokenize(
