@@ -11,8 +11,7 @@ def load_data(file_path: str) -> List[str]:
 
     # Read the file and split it into lines
     with open(file_path) as f:
-        lines = [line.strip() for line in f]
-    return lines
+        return [line.strip() for line in f]
 
 
 class NGramModel:
@@ -351,6 +350,7 @@ def evaluate_trigram_model_with_interpolation(
             )
 
             print(f"Perplexity: {perplexity}")
+            print()
 
             if perplexity < best_perplexity:
                 best_perplexity = perplexity
@@ -397,8 +397,6 @@ if __name__ == "__main__":
     evaluate_model(unigram_model, dev_data, "dev")
     evaluate_model(bigram_model, dev_data, "dev")
     evaluate_model(trigram_model, dev_data, "dev")
-
-    print()
 
     # Evaluate the models on the test data
     evaluate_model(unigram_model, test_data, "test")
