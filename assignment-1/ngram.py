@@ -374,9 +374,9 @@ def evaluate_model(model: NGramModel, data: List[str], data_name: str) -> None:
 
 if __name__ == "__main__":
     # Load the training, dev, and test data
-    training_data = load_data("1b_benchmark.train.tokens")
-    dev_data = load_data("1b_benchmark.dev.tokens")
-    test_data = load_data("1b_benchmark.test.tokens")
+    training_data = load_data("data/1b_benchmark.train.tokens")
+    dev_data = load_data("data/1b_benchmark.dev.tokens")
+    test_data = load_data("data/1b_benchmark.test.tokens")
 
     # Create an instance of the NGramModel for unigrams, bigrams, trigrams
     unigram_model = NGramModel(1)

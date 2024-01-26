@@ -1,6 +1,7 @@
 from collections import Counter
 from typing import Dict, List, Tuple
-from bpe import BytePairEncodingTokenizer, load_data
+from ngram import load_data
+from bpe import BytePairEncodingTokenizer
 
 
 class WordPieceTokenizer(BytePairEncodingTokenizer):
@@ -160,7 +161,7 @@ class WordPieceTokenizer(BytePairEncodingTokenizer):
 
 
 if __name__ == "__main__":
-    corpus = load_data("BPE-data.txt")
+    corpus = load_data("data/BPE-data.txt")
 
     # Split the corpus into training and test data
     training_data, test_data = corpus[:4000], corpus[4000:]

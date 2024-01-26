@@ -230,7 +230,7 @@ class BytePairEncodingTokenizer:
 
 
 if __name__ == "__main__":
-    corpus = load_data("BPE-data.txt")
+    corpus = load_data("data/BPE-data.txt")
 
     # Split the corpus into training and test data
     training_data, test_data = corpus[:4000], corpus[4000:]
