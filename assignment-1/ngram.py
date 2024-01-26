@@ -30,7 +30,8 @@ class NGramModel:
         self.context_counts: dict[Tuple[str], int] = defaultdict(int)
         self.vocabulary: Set[str] = set()
         self.smoothing_constant = smoothing_constant
-        # Lambdas are the weights for each n-gram model when using interpolation.
+        # Lambdas are the weights for each n-gram model when using
+        # interpolation.
         self.lambdas = lambdas
 
     # Preprocess the data by tokenizing it and prepending N - 1 <START> tokens
@@ -47,22 +48,22 @@ class NGramModel:
             # Prepend <START> token N - 1 times, where N - 1 is the model order.
             # For example, for a bigram model, prepend <START> once since we
             # need to see one word back. For a trigram model, prepend <START>
-            # twice, etc.
-            # Also, regardless of the model order, we always append <STOP> once.
+            # twice, etc. Also, regardless of the model order, we always append
+            # <STOP> once.
             tokens = ["<START>"] * (self.n - 1) + tokens + ["<STOP>"]
 
             tokenized_lines.append(tokens)
 
         if not is_training_data:
             # If this is false, this is not our first time preprocessing the
-            # data. This means that we have already built the vocabulary, so
-            # we want to preprocess the data according to the vocabulary
+            # data. This means that we have already built the vocabulary, so we
+            # want to preprocess the data according to the vocabulary
             # corresponding to our training data. This means we want to UNKify
             # the data using the same words we UNKified the training data with.
             # That way, we evaluate the model on the same data distribution that
-            # we trained it on. If we UNKify the dev and test data with different
-            # words, then we're evaluating the model on a different data
-            # distribution than we trained it on.
+            # we trained it on. If we UNKify the dev and test data with
+            # different words, then we're evaluating the model on a different
+            # data distribution than we trained it on.
             assert (
                 self.vocabulary
             ), "😳 Vocabulary is empty. Did you forget to train the model?"
@@ -79,10 +80,10 @@ class NGramModel:
         # Count the number of times each token appears in the data.
         token_counts = Counter([token for line in tokenized_lines for token in line])
 
-        # Replace tokens that appear less than 3 times with <UNK>. This helps
-        # us handle out-of-vocabulary (OOV) words.
+        # Replace tokens that appear less than 3 times with <UNK>. This helps us
+        # handle out-of-vocabulary (OOV) words.
         processed_lines = [
-            [token if token_counts[token] >= 3 else "<UNK>" for token in line]
+            [token if token_counts[token] >= 1 else "<UNK>" for token in line]
             for line in tokenized_lines
         ]
 
@@ -90,21 +91,21 @@ class NGramModel:
         # tokens in the training data. <STOP> and <UNK> are included in the
         # vocabulary, but <START> is not.
         self.vocabulary = set(
-            token if token_counts[token] >= 3 else "<UNK>" for token in token_counts
+            token if token_counts[token] >= 1 else "<UNK>" for token in token_counts
         )
 
-        # Remove the <START> token from the vocabulary (if it exists. Note
-        # that for a unigram model, we don't prepend <START> tokens). We don't
-        # want to predict <START> tokens, since they can only appear at the
-        # beginning of a sentence.
+        # Remove the <START> token from the vocabulary (if it exists. Note that
+        # for a unigram model, we don't prepend <START> tokens). We don't want
+        # to predict <START> tokens, since they can only appear at the beginning
+        # of a sentence.
         self.vocabulary.discard("<START>")
 
         return processed_lines
 
-    # Return the n-grams in a given sentence, where n = self.n.
-    # For example, if self.n = 3, return the set of trigrams for the sentence.
-    # If the sentence was ["<START>", "<START>", "I", "love", "CSE", "447",
-    # "<STOP>"], this function would return the following set of tuples:
+    # Return the n-grams in a given sentence, where n = self.n. For example, if
+    # self.n = 3, return the set of trigrams for the sentence. If the sentence
+    # was ["<START>", "<START>", "I", "love", "CSE", "447", "<STOP>"], this
+    # function would return the following set of tuples:
     # - ("<START>", "<START>", "I")
     # - ("<START>", "I", "love")
     # - ("I", "love", "CSE")
@@ -121,19 +122,18 @@ class NGramModel:
 
     # Train the N-gram model on the specified training data.
     def train(self, training_data: List[str]) -> None:
-        # Preprocess the data to prepare it for training. This means
-        # tokenizing each sentence and adding N - 1 <START> tokens and a <STOP>
-        # token to each sentence. Tokens that appear less than 3 times in the
-        # training data are replaced with <UNK>.
-        # Next, build the vocabulary for the training data. This is the set of
-        # unique tokens in the training data. <STOP> and <UNK> are included in
-        # the vocabulary, but <START> is not.
+        # Preprocess the data to prepare it for training. This means tokenizing
+        # each sentence and adding N - 1 <START> tokens and a <STOP> token to
+        # each sentence. Tokens that appear less than 3 times in the training
+        # data are replaced with <UNK>. Next, build the vocabulary for the
+        # training data. This is the set of unique tokens in the training data.
+        # <STOP> and <UNK> are included in the vocabulary, but <START> is not.
         self.training_data = self.preprocess_data(training_data, is_training_data=True)
 
-        # Update the n-gram counts and context counts based on the training data.
-        # Recall that the n-gram counts are the number of times each n-gram
-        # appears in the training data, and the context counts are the number
-        # of times each context appears in the training data.
+        # Update the n-gram counts and context counts based on the training
+        # data. Recall that the n-gram counts are the number of times each
+        # n-gram appears in the training data, and the context counts are the
+        # number of times each context appears in the training data.
         for sentence in self.training_data:
             for ngram in self.ngrams(sentence):
                 self.ngram_counts[ngram] += 1
@@ -144,13 +144,12 @@ class NGramModel:
 
     # Return the probability of the specified n-gram under the N-gram model.
     # Conceptually, this means the probability of the last word of the n-gram
-    # appearing given the context (i.e. the words leading up to the last word
-    # of the n-gram). For example, if the n-gram is ("I", "love", "CSE"), then
-    # we want to return P("CSE" | "I", "love").
-    # The formula we use to calculate this is simply the number of times the
-    # n-gram appears in the training data divided by the number of times the
-    # context appears in the training data. This is the maximum likelihood
-    # estimate (MLE) of the probability.
+    # appearing given the context (i.e. the words leading up to the last word of
+    # the n-gram). For example, if the n-gram is ("I", "love", "CSE"), then we
+    # want to return P("CSE" | "I", "love"). The formula we use to calculate
+    # this is simply the number of times the n-gram appears in the training data
+    # divided by the number of times the context appears in the training data.
+    # This is the maximum likelihood estimate (MLE) of the probability.
     def ngram_probability(
         self, ngram: Tuple[str], use_laplace_smoothing=False
     ) -> float:
@@ -158,32 +157,31 @@ class NGramModel:
         context_count = self.context_counts[ngram[:-1]]
 
         # If we want to apply smoothing, we use the Laplace smoothing formula.
-        # This means we add 1 to the numerator and the size of the vocabulary
-        # to the denominator.
+        # This means we add 1 to the numerator and the size of the vocabulary to
+        # the denominator.
         if use_laplace_smoothing:
             # (Count + k) / (Context count + k * V) where 0 < k < 1
             return (ngram_count + self.smoothing_constant) / (
                 context_count + self.smoothing_constant * len(self.vocabulary)
             )
 
-        # If the context count is 0, then we have never seen this context in
-        # the training data. This means that we have no information about what
-        # word should come next, so we return 0.
+        # If the context count is 0, then we have never seen this context in the
+        # training data. This means that we have no information about what word
+        # should come next, so we return 0.
         elif context_count == 0:
             return 0.0
 
         # Otherwise, we return the MLE of the probability.
         return ngram_count / context_count
 
-    # Return the log probability of the specified sentence under the N-gram model.
-    # Conceptually, this means the probability of our model predicting the
-    # sentence. Note that this will be a negative number, since the probability
-    # of a sentence is between 0 and 1, and the log of a number between 0 and 1
-    # is negative.
-    # Returns -infinity if the probability of the sentence being predicted by
-    # the model is 0. This can happen if the sentence contains an n-gram that
-    # has never appeared in the training data. We return -infinity because the
-    # log of 0 is -infinity.
+    # Return the log probability of the specified sentence under the N-gram
+    # model. Conceptually, this means the probability of our model predicting
+    # the sentence. Note that this will be a negative number, since the
+    # probability of a sentence is between 0 and 1, and the log of a number
+    # between 0 and 1 is negative. Returns -infinity if the probability of the
+    # sentence being predicted by the model is 0. This can happen if the
+    # sentence contains an n-gram that has never appeared in the training data.
+    # We return -infinity because the log of 0 is -infinity.
     def sentence_log_probability(
         self, processed_sentence: List[str], use_laplace_smoothing=False
     ) -> float:
@@ -207,16 +205,16 @@ class NGramModel:
 
     # Return the perplexity of the specified data under the N-gram model.
     def perplexity(self, data: List[str], use_laplace_smoothing=False) -> float:
-        # Preprocess the data, except this time we want to UNKify the data
-        # using the same words we UNKified the training data with. This is
-        # because we want to evaluate the model on the same data distribution
-        # that we trained it on. If we UNKify the dev and test data with
-        # different words, then we are evaluating the model on a different
-        # data distribution than we trained it on.
+        # Preprocess the data, except this time we want to UNKify the data using
+        # the same words we UNKified the training data with. This is because we
+        # want to evaluate the model on the same data distribution that we
+        # trained it on. If we UNKify the dev and test data with different
+        # words, then we are evaluating the model on a different data
+        # distribution than we trained it on.
         processed_data = self.preprocess_data(data, is_training_data=False)
 
-        # Calculate the log probability of each sentence in the data. Then,
-        # sum these log probabilities together.
+        # Calculate the log probability of each sentence in the data. Then, sum
+        # these log probabilities together.
         log_probability_sum = 0.0
         # Count the number of tokens in the data. This will be used to calculate
         # the perplexity.
@@ -227,32 +225,33 @@ class NGramModel:
             )
 
             # If the log probability of seeing the sentence is -infinity, then
-            # the perplexity is infinity. This is because perplexity is
-            # e^(-sum of log probabilities for all sentences / token count).
-            # So if the log probability is -infinity, then the perplexity will
-            # e^(infinity / token count), which is infinity.
+            # the perplexity is infinity. This is because perplexity is e^(-sum
+            # of log probabilities for all sentences / token count). So if the
+            # log probability is -infinity, then the perplexity will e^(infinity
+            # / token count), which is infinity.
             if log_probability == float("-inf"):
                 return float("inf")
 
             log_probability_sum += log_probability
 
-            # Add the number of tokens in the sentence to the token count.
-            # We subtract N - 1 from the length of the sentence because we
-            # prepend N - 1 <START> tokens to each sentence. We don't want
-            # to count these tokens when calculating the perplexity, since
-            # they are not part of the original sentence and our model doesn't
-            # predict them.
+            # Add the number of tokens in the sentence to the token count. We
+            # subtract N - 1 from the length of the sentence because we prepend
+            # N - 1 <START> tokens to each sentence. We don't want to count
+            # these tokens when calculating the perplexity, since they are not
+            # part of the original sentence and our model doesn't predict them.
             token_count += len(sentence) - (self.n - 1)
 
-        # Calculate the perplexity using the formula e^(-log probability / token count).
+        # Calculate the perplexity using the formula e^(-log probability / token
+        # count).
         return math.exp(-log_probability_sum / token_count)
 
     """
     INTERPOLATION FUNCTIONS (only works with trigram models)
     """
 
-    # Return the log probability of the specified sentence under the N-gram model
-    # using interpolation. NOTE: This function only works with trigram models.
+    # Return the log probability of the specified sentence under the N-gram
+    # model using interpolation. NOTE: This function only works with trigram
+    # models.
     def sentence_log_probability_with_interpolation(
         self,
         processed_sentence: List[str],
@@ -361,8 +360,8 @@ def evaluate_trigram_model_with_interpolation(
 
 
 # Evaluates the given n-gram model on the given dataset. Prints the perplexity
-# of the model on the dataset without any smoothing, with Laplace smoothing,
-# and with interpolation.
+# of the model on the dataset without any smoothing, with Laplace smoothing, and
+# with interpolation.
 def evaluate_model(model: NGramModel, data: List[str], data_name: str) -> None:
     print(f"{model.n}-gram model perplexity on {data_name} set...")
     print(f"No smoothing:\t\t\t{model.perplexity(data)}")
@@ -388,10 +387,10 @@ if __name__ == "__main__":
     bigram_model.train(training_data)
     trigram_model.train(training_data)
 
-    # Evaluate the models on the training data
-    evaluate_model(unigram_model, training_data, "training")
-    evaluate_model(bigram_model, training_data, "training")
-    evaluate_model(trigram_model, training_data, "training")
+    # # Evaluate the models on the training data
+    # evaluate_model(unigram_model, training_data, "training")
+    # evaluate_model(bigram_model, training_data, "training")
+    # evaluate_model(trigram_model, training_data, "training")
 
     # Evaluate the models on the dev data
     evaluate_model(unigram_model, dev_data, "dev")
@@ -403,7 +402,17 @@ if __name__ == "__main__":
     evaluate_model(bigram_model, test_data, "test")
     evaluate_model(trigram_model, test_data, "test")
 
-    # Evaluate the trigram model with interpolation on the dev data
-    evaluate_trigram_model_with_interpolation(
-        dev_data, "dev", unigram_model, bigram_model
-    )
+    # Evaluate the trigram model with interpolation on the training data
+    # evaluate_trigram_model_with_interpolation(
+    #     training_data, "training", unigram_model, bigram_model
+    # )
+
+    # # Evaluate the trigram model with interpolation on the dev data
+    # evaluate_trigram_model_with_interpolation(
+    #     dev_data, "dev", unigram_model, bigram_model
+    # )
+
+    # # Evaluate the trigram model with interpolation on the test data
+    # evaluate_trigram_model_with_interpolation(
+    #     test_data, "test", unigram_model, bigram_model
+    # )

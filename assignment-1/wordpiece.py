@@ -17,8 +17,8 @@ class WordPieceTokenizer(BytePairEncodingTokenizer):
         Computes the scores for each pair of adjacent tokens in the vocabulary.
         Scores are calculated using the formula:
                 score(ab) = frequency(ab) / frequency(a) * frequency(b)
-        where ab is an adjacent pair of tokens, and a and b are the tokens in the
-        pair. This formula is taken from the original WordPiece paper.
+        where ab is an adjacent pair of tokens, and a and b are the tokens in
+        the pair. This formula is taken from the original WordPiece paper.
 
         Returns:
             A dictionary mapping each pair of adjacent tokens to its score.
@@ -66,7 +66,8 @@ class WordPieceTokenizer(BytePairEncodingTokenizer):
         # Build the base vocabulary
         super().build_vocabulary()
 
-        # Split each word into individual characters to start the training process
+        # Split each word into individual characters to start the training
+        # process
         self.words_to_tokens = {
             word: list(word) for word in self.word_frequencies.keys()
         }
@@ -74,7 +75,8 @@ class WordPieceTokenizer(BytePairEncodingTokenizer):
         # Merge the most frequent pair of adjacent tokens in the vocabulary
         # until we have learned 4000 merge rules
         while len(self.merge_rules) < 4000:
-            # Compute the scores for each pair of adjacent tokens in the vocabulary
+            # Compute the scores for each pair of adjacent tokens in the
+            # vocabulary
             pair_scores = self.compute_pair_scores()
 
             # Get the pair with the highest score
@@ -88,8 +90,8 @@ class WordPieceTokenizer(BytePairEncodingTokenizer):
     def tokenize_word(self, word: str) -> List[str]:
         """
         Tokenizes the given word using the trained tokenizer. For WordPiece,
-        tokenization is done by greedily matching the longest possible token
-        in the vocabulary at each step.
+        tokenization is done by greedily matching the longest possible token in
+        the vocabulary at each step.
 
         Args:
             word: The word to tokenize.
@@ -106,8 +108,8 @@ class WordPieceTokenizer(BytePairEncodingTokenizer):
 
         while len(word) > 0:
             # We initialize i to the length of the word and decrement it until
-            # we find a substring match from the beginning of the word to i
-            # that is in the vocabulary
+            # we find a substring match from the beginning of the word to i that
+            # is in the vocabulary
             i = len(word)
             while i > 0 and word[:i] not in self.vocabulary:
                 i -= 1
@@ -123,21 +125,19 @@ class WordPieceTokenizer(BytePairEncodingTokenizer):
             # Remove the token from the word and continue
             word = word[i:]
 
-            # After the first iteration, if we still have parts of the word
-            # left to tokenize, we need to add the prefix symbol to the token.
-            # This is because the remaining parts of the word are not the
-            # beginning of a word, so we need to add the prefix symbol to
-            # correctly tokenize them.
-            # if len(word) > 0:
-            #     word = self.SPACE_SYMBOL + word
+            # After the first iteration, if we still have parts of the word left
+            # to tokenize, we need to add the prefix symbol to the token. This
+            # is because the remaining parts of the word are not the beginning
+            # of a word, so we need to add the prefix symbol to correctly
+            # tokenize them. if len(word) > 0: word = self.SPACE_SYMBOL + word
 
         return tokens
 
     def tokenize(self, text: str) -> List[str]:
         """
         Tokenizes the given text using the trained tokenizer. For WordPiece,
-        tokenization is done by greedily matching the longest possible token
-        in the vocabulary at each step.
+        tokenization is done by greedily matching the longest possible token in
+        the vocabulary at each step.
 
         Args:
             text: The text to tokenize.

@@ -33,15 +33,16 @@ class BytePairEncodingTokenizer:
             words = line.split()
             # Increment the count for the first word in the line without a space
             word_frequencies[words[0]] += 1
-            # Update the Counter with the rest of the words prefixed with a space
+            # Update the Counter with the rest of the words prefixed with a
+            # space
             word_frequencies.update(self.SPACE_SYMBOL + word for word in words[1:])
 
         return word_frequencies
 
     def build_vocabulary(self) -> None:
         """
-        Builds the base vocabulary from the word frequencies. The base vocabulary
-        is a set containing all the characters used in the corpus.
+        Builds the base vocabulary from the word frequencies. The base
+        vocabulary is a set containing all the characters used in the corpus.
         """
 
         assert (
@@ -57,16 +58,16 @@ class BytePairEncodingTokenizer:
         """
         Compute the frequencies of adjacent token pairs in the vocabulary.
 
-        This method iterates through each word in the word frequencies dictionary,
-        splits the word into its constituent tokens, and counts the frequency of
-        each adjacent token pair. This is a critical step in the BPE training
-        algorithm, as it identifies the most common pairs of tokens to merge
-        in subsequent iterations of the algorithm.
+        This method iterates through each word in the word frequencies
+        dictionary, splits the word into its constituent tokens, and counts the
+        frequency of each adjacent token pair. This is a critical step in the
+        BPE training algorithm, as it identifies the most common pairs of tokens
+        to merge in subsequent iterations of the algorithm.
 
         Returns:
-            A dictionary of token pairs with their corresponding frequency counts.
-            Each key is a tuple containing a pair of tokens, and the value is the
-            frequency of that pair within the entire corpus.
+            A dictionary of token pairs with their corresponding frequency
+            counts. Each key is a tuple containing a pair of tokens, and the
+            value is the frequency of that pair within the entire corpus.
         """
 
         assert self.word_frequencies, "😳 Word frequencies must be initialized"
@@ -78,9 +79,9 @@ class BytePairEncodingTokenizer:
             # Get the tokens in the word
             tokens_in_word = self.words_to_tokens[word]
 
-            # If the word itself is a token, skip it as it cannot be adjacent
-            # to any other tokens in the corpus. This is because the word itself
-            # is separated from the rest of the corpus by spaces, so it can't be
+            # If the word itself is a token, skip it as it cannot be adjacent to
+            # any other tokens in the corpus. This is because the word itself is
+            # separated from the rest of the corpus by spaces, so it can't be
             # merged any further.
             if len(tokens_in_word) == 1:
                 continue
@@ -99,8 +100,8 @@ class BytePairEncodingTokenizer:
 
         This method updates the vocabulary to reflect the merged token, and
         updates the tokens dictionary to reflect the merged token in each word
-        in the corpus. This is a critical step in the BPE training algorithm,
-        as it merges the most common pair of tokens in the corpus.
+        in the corpus. This is a critical step in the BPE training algorithm, as
+        it merges the most common pair of tokens in the corpus.
 
         Args:
             pair: A tuple containing the pair of tokens to merge.
@@ -124,8 +125,8 @@ class BytePairEncodingTokenizer:
 
             i = 0
             while i < len(tokens_in_word) - 1:
-                # If the current token and the next token are the two tokens
-                # to merge, replace them with the merged token
+                # If the current token and the next token are the two tokens to
+                # merge, replace them with the merged token
                 if (tokens_in_word[i], tokens_in_word[i + 1]) == pair:
                     tokens_in_word = (
                         tokens_in_word[:i] + [merged_token] + tokens_in_word[i + 2 :]
@@ -161,7 +162,8 @@ class BytePairEncodingTokenizer:
         # Print the size of the initial vocabulary
         print(f"Initial vocabulary size: {len(self.vocabulary)}")
 
-        # Split each word into individual characters to start the training process
+        # Split each word into individual characters to start the training
+        # process
         self.words_to_tokens = {
             word: list(word) for word in self.word_frequencies.keys()
         }
