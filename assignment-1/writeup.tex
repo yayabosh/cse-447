@@ -133,7 +133,7 @@ the \texttt{WordPieceTokenizer} which inherited from the
 		I built my $n$-gram models using a class called \texttt{NGramModel} which
 		has a couple fields and methods. The fields are:
 		\begin{itemize}
-			\item \texttt{self.n}: The $n$ in $n$-gram.
+			\item \texttt{n}: The $n$ in $n$-gram.
 			\item \texttt{ngram\_counts}: A dictionary that maps $n$-grams to their
 			      counts.
 			\item \texttt{context\_counts}: A dictionary that maps contexts to their
@@ -577,10 +577,9 @@ the \texttt{WordPieceTokenizer} which inherited from the
 				it's in the training data or not. BPE on the other hand, can only
 				represent tokens that are in the training data, so there's still a
 				possibility of encountering an out-of-vocabulary token.            &
-				Linguistically speaking, there is a benefit in storing words as
-				individual tokens (that aren't just characters). This is because words
-				have \textbf{meaning}, and encoding them as individual characters loses
-				that meaning that can stitch together the characters to form a word. For
+				Linguistically speaking, there is a benefit in storing tokens that that
+				aren't just characters. This is because words have \textbf{meaning}, and
+				encoding them as individual characters can lose that meaning. For
 				example, the suffix ``ing" is a common suffix in English that denotes
 				the present participle tense. If we encode each character as a token, we
 				lose this meaning, and the model has to learn it from scratch. BPE
