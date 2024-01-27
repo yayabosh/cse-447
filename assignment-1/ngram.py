@@ -1,17 +1,8 @@
-from collections import Counter, defaultdict
 import math
+from collections import Counter, defaultdict
 from typing import List, Set, Tuple
 
-
-def load_data(file_path: str) -> List[str]:
-    """
-    Loads the data from the specified file path and returns a list of lines from
-    the file, stripped of whitespace.
-    """
-
-    # Read the file and split it into lines
-    with open(file_path) as f:
-        return [line.strip() for line in f]
+from utils import load_data
 
 
 class NGramModel:
@@ -83,7 +74,7 @@ class NGramModel:
         # Replace tokens that appear less than 3 times with <UNK>. This helps us
         # handle out-of-vocabulary (OOV) words.
         processed_lines = [
-            [token if token_counts[token] >= 1 else "<UNK>" for token in line]
+            [token if token_counts[token] >= 3 else "<UNK>" for token in line]
             for line in tokenized_lines
         ]
 
@@ -91,7 +82,7 @@ class NGramModel:
         # tokens in the training data. <STOP> and <UNK> are included in the
         # vocabulary, but <START> is not.
         self.vocabulary = set(
-            token if token_counts[token] >= 1 else "<UNK>" for token in token_counts
+            token if token_counts[token] >= 3 else "<UNK>" for token in token_counts
         )
 
         # Remove the <START> token from the vocabulary (if it exists. Note that
@@ -387,10 +378,10 @@ if __name__ == "__main__":
     bigram_model.train(training_data)
     trigram_model.train(training_data)
 
-    # # Evaluate the models on the training data
-    # evaluate_model(unigram_model, training_data, "training")
-    # evaluate_model(bigram_model, training_data, "training")
-    # evaluate_model(trigram_model, training_data, "training")
+    # Evaluate the models on the training data
+    evaluate_model(unigram_model, training_data, "training")
+    evaluate_model(bigram_model, training_data, "training")
+    evaluate_model(trigram_model, training_data, "training")
 
     # Evaluate the models on the dev data
     evaluate_model(unigram_model, dev_data, "dev")
@@ -403,16 +394,16 @@ if __name__ == "__main__":
     evaluate_model(trigram_model, test_data, "test")
 
     # Evaluate the trigram model with interpolation on the training data
-    # evaluate_trigram_model_with_interpolation(
-    #     training_data, "training", unigram_model, bigram_model
-    # )
+    evaluate_trigram_model_with_interpolation(
+        training_data, "training", unigram_model, bigram_model
+    )
 
-    # # Evaluate the trigram model with interpolation on the dev data
-    # evaluate_trigram_model_with_interpolation(
-    #     dev_data, "dev", unigram_model, bigram_model
-    # )
+    # Evaluate the trigram model with interpolation on the dev data
+    evaluate_trigram_model_with_interpolation(
+        dev_data, "dev", unigram_model, bigram_model
+    )
 
-    # # Evaluate the trigram model with interpolation on the test data
-    # evaluate_trigram_model_with_interpolation(
-    #     test_data, "test", unigram_model, bigram_model
-    # )
+    # Evaluate the trigram model with interpolation on the test data
+    evaluate_trigram_model_with_interpolation(
+        test_data, "test", unigram_model, bigram_model
+    )
