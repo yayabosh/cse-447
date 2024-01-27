@@ -1,16 +1,22 @@
 from collections import Counter
 from typing import Dict, List, Tuple
-from ngram import load_data
+
 from bpe import BytePairEncodingTokenizer
+from utils import load_data, produce_scatterplot
 
 
 class WordPieceTokenizer(BytePairEncodingTokenizer):
     """
-    A tokenizer that uses the WordPiece algorithm to tokenize text.
+    A tokenizer that uses the WordPiece algorithm to tokenize text. This class
+    inherits from the BytePairEncodingTokenizer class, which implements the core
+    functionality of the Byte Pair Encoding algorithm. Since we were told to
+    pretokenize our corpus just like we did for BPE, we can reuse the
+    functionality and override the train and tokenize methods to implement the
+    WordPiece algorithm.
     """
 
     def __init__(self):
-        super().__init__()
+        super().__init__()  # see bpe.py for more details
 
     def compute_pair_scores(self) -> Dict[Tuple[str, str], float]:
         """
@@ -72,6 +78,18 @@ class WordPieceTokenizer(BytePairEncodingTokenizer):
             word: list(word) for word in self.word_frequencies.keys()
         }
 
+        # Calculate the initial corpus length
+        tokenized_corpus = [self.tokenize(line) for line in corpus]
+        initial_corpus_length = sum(len(tokens) for tokens in tokenized_corpus)
+
+        # Lists to store vocabulary sizes and corpus lengths
+        vocabulary_sizes = [len(self.vocabulary)]
+        corpus_lengths = [initial_corpus_length]
+
+        # Track the number of iterations. We only want to tokenize the corpus
+        # every 100 iterations, so we use this to keep track of when to do so.
+        num_iterations = 0
+
         # Merge the most frequent pair of adjacent tokens in the vocabulary
         # until we have learned 4000 merge rules
         while len(self.merge_rules) < 4000:
@@ -82,10 +100,34 @@ class WordPieceTokenizer(BytePairEncodingTokenizer):
             # Get the pair with the highest score
             best_pair = max(pair_scores, key=pair_scores.get)
 
-            print(f"Merging pair: {best_pair}")
+            print(best_pair)
 
             # Merge the pair
             super().merge_tokens(best_pair)
+
+            if num_iterations % 100 == 0:
+                # Record the size of the vocabulary
+                vocabulary_sizes.append(len(self.vocabulary))
+
+                # Tokenize the training data to get the corpus length in tokens
+                tokenized_corpus = [self.tokenize(line) for line in corpus]
+
+                corpus_length = sum(len(tokens) for tokens in tokenized_corpus)
+
+                # Record the corpus length in tokens
+                corpus_lengths.append(corpus_length)
+
+            num_iterations += 1
+
+        # Plot the vocabulary size and corpus length over time
+        produce_scatterplot(
+            vocabulary_sizes,
+            corpus_lengths,
+            title="Vocabulary Size vs Training Corpus Length Over Iterations",
+            x_label="Vocabulary Size",
+            y_label="Training Corpus Length",
+            file_name="wordpiece_training.png",
+        )
 
     def tokenize_word(self, word: str) -> List[str]:
         """
@@ -125,12 +167,6 @@ class WordPieceTokenizer(BytePairEncodingTokenizer):
             # Remove the token from the word and continue
             word = word[i:]
 
-            # After the first iteration, if we still have parts of the word left
-            # to tokenize, we need to add the prefix symbol to the token. This
-            # is because the remaining parts of the word are not the beginning
-            # of a word, so we need to add the prefix symbol to correctly
-            # tokenize them. if len(word) > 0: word = self.SPACE_SYMBOL + word
-
         return tokens
 
     def tokenize(self, text: str) -> List[str]:
@@ -155,9 +191,9 @@ class WordPieceTokenizer(BytePairEncodingTokenizer):
         words = list(word_frequencies.keys())
 
         # Tokenize each word into a list of list of tokens
-        tokenized_words = [self.tokenize_word(word) for word in words]
+        tokens_in_words = [self.tokenize_word(word) for word in words]
 
-        return [token for tokenized_word in tokenized_words for token in tokenized_word]
+        return [token for tokens_in_word in tokens_in_words for token in tokens_in_word]
 
 
 if __name__ == "__main__":
@@ -169,8 +205,6 @@ if __name__ == "__main__":
     # Initialize the tokenizer and train it on the training data
     tokenizer = WordPieceTokenizer()
     tokenizer.train(training_data)
-
-    print(f"Vocabulary size: {len(tokenizer.vocabulary)}")
 
     # Tokenize the training data
     tokenized_training_data = [tokenizer.tokenize(line) for line in training_data]

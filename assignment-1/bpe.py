@@ -1,6 +1,7 @@
-from collections import defaultdict, Counter
-from typing import Dict, List, Tuple, Set
-from ngram import load_data
+from collections import Counter, defaultdict
+from typing import Dict, List, Set, Tuple
+
+from utils import load_data, produce_scatterplot
 
 
 class BytePairEncodingTokenizer:
@@ -13,7 +14,7 @@ class BytePairEncodingTokenizer:
         self.vocabulary: Set[str] = set()
         self.words_to_tokens: Dict[str, List[str]] = {}
         self.merge_rules: Dict[Tuple[str, str], str] = {}
-        self.SPACE_SYMBOL = "Ġ"
+        self.SPACE_SYMBOL: str = "Ġ"
 
     def pre_tokenize(self, corpus: List[str]) -> Counter[str]:
         """
@@ -168,6 +169,18 @@ class BytePairEncodingTokenizer:
             word: list(word) for word in self.word_frequencies.keys()
         }
 
+        # Calculate the initial corpus length
+        tokenized_corpus = [self.tokenize(line) for line in corpus]
+        initial_corpus_length = sum(len(tokens) for tokens in tokenized_corpus)
+
+        # Lists to store vocabulary sizes and corpus lengths
+        vocabulary_sizes = [len(self.vocabulary)]
+        corpus_lengths = [initial_corpus_length]
+
+        # Track the number of iterations. We only want to tokenize the corpus
+        # every 500 iterations, so we use this to keep track of when to do so.
+        num_iterations = 0
+
         # Compute the frequencies of adjacent token pairs in the vocabulary
         pair_frequencies = self.compute_pair_frequencies()
         # Get the most frequent pair of tokens in the corpus
@@ -181,6 +194,31 @@ class BytePairEncodingTokenizer:
             pair_frequencies = self.compute_pair_frequencies()
             # Get the most frequent pair of tokens in the corpus
             most_frequent_pair = max(pair_frequencies, key=pair_frequencies.get)
+
+            if num_iterations % 500 == 0:
+                # Record the size of the vocabulary
+                vocabulary_sizes.append(len(self.vocabulary))
+
+                # Tokenize the training data to get the corpus length in tokens
+                tokenized_corpus = [self.tokenize(line) for line in corpus]
+
+                corpus_length = sum(len(tokens) for tokens in tokenized_corpus)
+
+                print(f"Iteration {num_iterations}: {corpus_length} tokens")
+
+                # Record the corpus length in tokens
+                corpus_lengths.append(corpus_length)
+
+            num_iterations += 1
+
+        produce_scatterplot(
+            vocabulary_sizes,
+            corpus_lengths,
+            title="Vocabulary Size vs Training Corpus Length Over Iterations",
+            x_label="Vocabulary Size",
+            y_label="Training Corpus Length",
+            file_name="bpe_training.png",
+        )
 
     def tokenize(self, text: str) -> List[str]:
         """
