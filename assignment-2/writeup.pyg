@@ -1,0 +1,19 @@
+    def self\_attention(Q, K, V, n\_heads=1, causal=True):
+
+        # # TODO: Step 2 -- create and apply the causal mask to attention.
+        # if causal:
+        #     mask = make_causal_mask(n_tok)
+        #     A = apply_causal_mask(mask, A)
+
+        # TODO: Step 1 -- softmax the raw attention and use it to get outputs.
+        # Hint: you need two lines here.
+        A = attn_softmax(A)
+
+        # Experiment code: Apply the mask after softmax, naively setting things to 0.
+        if causal:
+            mask = make_causal_mask(n_tok)
+            A = apply_naive_causal_mask(mask, A)
+
+        y = compute_outputs(A, V)
+
+        return y

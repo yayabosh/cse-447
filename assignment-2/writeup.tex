@@ -418,20 +418,45 @@ many different possible solutions.
  the third \textit{key} vector $k_2$ for each of the following cases.
     
 \begin{enumerate}
-    \item Come up with a replacement for only the third \textit{key} vector
-    $k_2$ such that the result of attention with the same unchanged
+    \item \textbf{Come up with a replacement for only the third \textit{key}
+    vector $k_2$ such that the result of attention with the same unchanged
     \textit{query} $q$ from \S 1.3.2 averages the first three \textit{value}
-    vectors. Briefly explain how you get your solution.
+    vectors. Briefly explain how you get your solution.}
 
-    \item Come up with a replacement for only the third \textit{key} vector
-    $k_2$ such that the result of attention with the same unchanged
+    Given that the query $q$ from 1.3.2 averages the first two value vectors, to
+    extend this to the first three value vectors without altering $q$, we need
+    to change $k_2$ such that it makes the dot product with $q$ equivalent to
+    that of the first two keys. Since $q$ is the average of the first two keys
+    $k_0$ and $k_1$, \boxed{\text{we could set $k_2$ to this same value}}. This
+    will result in the dot product of $q$ and $k_2$ being similar to the dot
+    product of $q$ with $k_0$ and $k_1$. Thus, the softmax will treat them
+    similarly, and the output will be the average of the first three value
+    vectors.
+
+    \item \textbf{Come up with a replacement for only the third \textit{key}
+    vector $k_2$ such that the result of attention with the same unchanged
     \textit{query} $q$ from \S 1.3.2 returns the third \textit{value} vector
     $v_2$. However, there is the condition that $k_2$ should have length $=1$.
     This is not usually a restriction in attention, but is only for this
-    problem. Briefly explain how you get your solution.
+    problem. Briefly explain how you get your solution.}
 
-    \item Why is altering $k_2$ able to impact an output which previously only
-    considered the first two tokens? (2-4 sentences)
+    For the softmax to return $v_2$, we need the dot product of $q$ with $k_2$
+    to be significantly higher than its dot product with other key vectors.
+    Given the condition that $k_2$ should have length $= 1$, we can achieve this
+    by aligning $k_2$ in the direction of $q$ and scaling it to have a unit
+    length. This means $k_2$ would become the normalized version of $q$, that
+    is, $\boxed{k_2 = \frac{q}{\|\|q\|\|}}$.
+
+    \item \textbf{Why is altering $k_2$ able to impact an output which
+    previously only considered the first two tokens? (2-4 sentences)}
+
+    Altering $k_2$ affects the output because the attention mechanism relies on
+    the dot products between the query and key vectors to determine the
+    weighting of the value vectors. Changing $k_2$ alters these dot products and
+    thus changes the weights assigned to the corresponding value vectors during
+    the attention calculation. This shows the sensitivity of attention to the
+    input key vectors, and how small changes can lead to significant differences
+    in the output.
 \end{enumerate}
 
 \newpage
@@ -827,6 +852,198 @@ for} \verb|self_attention()| \textbf{is a single line of code.}
 
 \newpage
 
+\paragraph{Setup of the experiment.}
+
+\paragraph{Motivating idea.} I chose to experiment by trying the naive masking
+approach of setting attention values to 0 \textit{after} the softmax instead of
+setting to $-\infty$ \textit{before} the softmax.
+
+Causal attention masking is done to prevent the model from ``cheating" by
+looking at future tokens when making predictions. The traditional way to do this
+is to set the attention scores (above the main diagonal) to $-\infty$ before
+applying the softmax across the rows. This way, the softmax will assign a
+probability of 0 to the future tokens, and the model will not use them when
+making predictions.
+
+However, I was curious to see what would happen if we tried to set the attention
+scores to 0 after the softmax. Conceptually, this approach is about the same,
+although could be somewhat easier to understand. It's simple to think about the
+attention scores and ``just set the ones you don't care about to 0", instead of
+having to think about $-\infty$ and the softmax.
+
+\paragraph{Relevant background.} The reason we set the attention scores to
+$-\infty$ before the softmax is to prevent the model from using future tokens
+when making predictions. The softmax function will use what its given: if we
+provide it with the vector $[2.2, 1.2, -\infty, -\infty]$, it will assign a high
+probability to the first two tokens and a probability of 0 to the last two
+tokens. That's because the $-\infty$ doesn't contribute to the sum in the
+denominator of the softmax, and so the softmax will assign a probability of 0 to
+the last two tokens.
+
+However, if we provide softmax with the attention scores $[-20, -12, 20, 25]$,
+it will assign a \textit{lower} probability to the first two tokens and a really
+high probability to the last two tokens. This is because the last two tokens
+have much higher scores than the first two tokens.
+
+Suppose the result of applying softmax to this vector was $[0.01, 0.02, 0.48,
+0.49]$. In the naive masking algorithm, we would actually end up masking the
+last two values here, and end up with $[0.01, 0.02, 0, 0]$. Whereas if we had
+done the original masking algorithm, we would have ended up with something like
+$[0.4, 0.6, 0, 0]$. Clearly, these are very different distributions! Which means
+that the model will be using very different information when making predictions.
+
+\paragraph{Hypothesis.} My hypothesis was that I actually had no idea what would
+happen: good or bad. So, I divided up what I thought could happen into two
+categories: (1) What could go wrong, and (2) What could go right, and tried to
+use that as a compass to guide my expectations.
+
+\paragraph{What could go wrong.}
+
+\begin{itemize}
+    \item The naive approach might disrupt the intended probability distribution
+    of the sequence. This would lead to the model using the wrong information
+    when making predictions, and would likely lead to a higher perplexity.
+    \item Maybe this would lead to a model that performs well on the training
+    data, but does not generalize well to new data. That's because this approach
+    might not let a model properly handle the causal relationships in the
+    sequence, which are obviously critical.
+\end{itemize}
+
+\paragraph{What could go right.}
+
+\begin{itemize}
+    \item The naive approach might actually act as a form of
+    \textbf{regularization}. By directly setting the attention scores to 0,
+    regardless of their true value, we might be avoiding overconfidence in
+    certain predictions and end up preventing overfitting to the training data.
+    \item Perhaps the model learns an alternate pathway for prediction, which
+    would lead to a more robust model that does not overly rely on specific
+    tokens.
+    \item Depending on the dataset, the naive approach might actually work
+    better than the traditional approach. For example, if the dataset has a lot
+    of noise, the traditional approach might be too aggressive in masking out
+    future tokens while applying too much probability mass to current and past
+    tokens, whereas the naive approach (which could act as a regularizer) might
+    actually work better.
+\end{itemize}
+\vspace{0.5cm}
+\textbf{Results.}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{minipage}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/traininglossnormal.png}
+        \caption{Training loss with normal causal masking.}
+        \label{fig:traininglossnormal}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/traininglossnaive.png}
+        \caption{Training loss with naive causal masking.}
+        \label{fig:traininglossnaive}
+    \end{minipage}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{minipage}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/trainingpplnormal98.png}
+        \caption{Smoothed training perplexity with normal causal masking.}
+        \label{fig:trainingpplnormal}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/trainingpplnaive98.png}
+        \caption{Smoothed training perplexity with naive causal masking.}
+        \label{fig:trainingpplnaive}
+    \end{minipage}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{plots/validationpplnormal98.png}
+    \caption{Smoothed validation perplexity with normal causal masking.}
+    \label{fig:validationpplnormal}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{plots/validationpplnaive98.png}
+    \caption{Smoothed validation perplexity with naive causal masking.}
+    \label{fig:validationpplnaive}
+\end{figure}
+\newpage
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{|c|c|c|}
+        \hline
+        \textbf{Masking Approach} & \textbf{Training Perplexity} &
+        \textbf{Validation Perplexity} \\
+        \hline
+        Normal Causal Masking & 949.59 & 228.15 \\
+        \hline
+        Naive Causal Masking & 894.52 & 228.15 \\
+        \hline
+    \end{tabular}
+    \caption{Average Training and Validation Perplexities}
+\end{table}
+
+\textbf{Interpretation of results.}
+
+The results were quite interesting! The training loss, training perplexity, and
+validation perplexity were all \textit{lower} with naive causal masking than
+with normal causal masking. This was quite surprising to me, as I had expected
+the naive approach to perform worse than the traditional approach.\\\\
+My guess for this is twofold:
+
+\begin{itemize}
+    \item The naive approach might have acted as a form of regularization. By
+    directly setting the attention scores to 0, regardless of their true value,
+    we might have been avoiding overconfidence in certain predictions and ended
+    up preventing overfitting to the training data.
+    \item The naive approach might have actually worked better than the
+    traditional approach, but only on this specific dataset. For example, if the
+    dataset has a lot of noise, the traditional approach might be too aggressive
+    in masking out future tokens while applying too much probability mass to
+    current and past tokens, whereas the naive approach (which could act as a
+    regularizer) might actually work better. Then again, I can't be sure of this
+    without further experimentation on different datasets.
+\end{itemize}
+
+My gut tells me that the naive approach is not as good as the normal approach, I
+mean it's literally called the ``naive" approach. But the results are the
+results, and I can't argue with them. I would like to do further experimentation
+on different datasets to see if the naive approach is actually better than the
+normal approach, or if it was just a fluke on this specific dataset. I would
+also like to experiment with different hyperparameters and see if the naive
+approach is still better than the normal approach, as I just used the same
+hyperparameters for both approaches in this experiment.
+
+\newpage
+
+\textbf{Edited code. Plotting functions have been omitted.}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{plots/self_attention.png}
+    \caption{The edited code in the self\_attention function. Notice the causal
+    masking occurring after the softmax function.}
+    \label{fig:selfattention}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{plots/apply_naive_causal_mask.png}
+    \caption{The new naive causal masking function. This was called instead in
+    this experiment to compare the regular approach with the naive one.}
+    \label{fig:naive_causal_masking}
+\end{figure}
+
+\newpage
+
 \section{HuggingFace (40\%)}
 
 In this part of the assignment, you will complete a codebase used to finetune a
@@ -914,88 +1131,316 @@ your report.
     \item[\textit{Step 1:}] \textit{Defining PyTorch Dataset and Dataloader}
     
     \begin{itemize}
-        \item[\textbf{Q1.1:}] Explain the usages of the following arguments when
-        you encode the input texts: \texttt{padding}, \texttt{max\_length},
-        \texttt{truncation}, \texttt{return\_tensors}.
-        \item[\textbf{Q1.2:}] For the above arguments, explain what are the
-        potential advantages of setting them to the default values we provide.
+        \item[\textbf{Q1.1:}] \textbf{Explain the usages of the following
+        arguments when you encode the input texts: \texttt{padding},
+        \texttt{max\_length}, \texttt{truncation}, \texttt{return\_tensors}.}
+        
+        \begin{itemize}
+            \item \texttt{padding} --- When batching sequences together, each
+            sequence needs to be the same length. Padding is applied to make
+            sure all sequences in a batch are the same length for the model to
+            process them in parallel. If \texttt{padding = True | "longest"},
+            the tokenizer will add a special token to the sequences shorter than
+            the longest sequence in the batch to match its length.
+
+            \item \texttt{truncation} --- If \texttt{truncation = True},
+            sequences longer than \texttt{max\_length} will be truncated down to
+            that length. 
+
+            \item \texttt{max\_length} --- This is the maximum length of the
+            sequence after tokenization. If a sequence is longer than
+            \texttt{max\_length}, it will be truncated to this length.
+
+            \item \texttt{return\_tensors} --- Setting \texttt{return\_tensors =
+            "pt"} tells the tokenizer to return the sequences as PyTorch
+            tensors. Other options include \texttt{"tf"} for TensorFlow tensors
+            or \texttt{"np"} for NumPy arrays.
+        \end{itemize}
+
+        \texttt{https://huggingface.co/docs/transformers/v4.37.2/en/main\_classes\\
+        /tokenizer\#transformers.PreTrainedTokenizerFast.encode} was very
+        helpful for understanding these arguments.
+
+        \item[\textbf{Q1.2:}] \textbf{For the above arguments, explain what are
+        the potential advantages of setting them to the default values we
+        provide.}
+
+        \begin{itemize}
+            \item \texttt{padding=True} --- We're ensuring that all sequences in
+            a batch have the same length. This uniformity is required for batch
+            processing on GPUs, which significantly speeds up training and
+            evaluation since matrix operations on a GPU are highly parallelized.
+            Without padding, batch processing would not be possible, and each
+            sequence would need to be processed individually, which is way more
+            inefficient.
+
+            \item \texttt{truncation=True} --- By enabling truncation, we're
+            making sure that any sequence longer than 512 tokens is cut down,
+            preventing errors from sequences that are too long for the model to
+            handle.
+
+            \item \texttt{max\_length=512} --- I looked it up, and it seems like
+            many transformer models (like BERT) are trained on a maximum
+            sequence length of 512 tokens. I guess this ensures we're using the
+            model in the way it was designed and trained for, and also manages
+            memory usage by keeping the sequences bounded.
+
+            \item \texttt{return\_tensors="pt"} --- We can feed the sequences
+            directly into the model without any further processing, since
+            they're already in PyTorch tensor format. This is convenient and
+            saves time and memory.
+        \end{itemize}
     \end{itemize}
-    
+
     \item[\textit{Step 2:}] \textit{Loading Data}
     
     \begin{itemize}
-        \item[\textbf{Q2.1:}] What are the lengths of train, validation, test
-        datasets?
+        \item[\textbf{Q2.1:}] \textbf{What are the lengths of train, validation,
+        test datasets?}
+
+        \begin{itemize}
+            \item \textbf{Training set}: 6,920
+            \item \textbf{Validation set}: 872
+            \item \textbf{Test set}: 1,821
+        \end{itemize}
         
-        \item[\textbf{Q2.2:}] Explain the role of each of the following
+        \item[\textbf{Q2.2:}] \textbf{Explain the role of each of the following
         parameters: \texttt{batch\_size}, \texttt{shuffle},
         \texttt{collate\_fn}, \texttt{num\_workers} given to the
-        \texttt{DataLoader} in the above code block.
+        \texttt{DataLoader} in the above code block.}
+
+        \begin{itemize}
+            \item \texttt{batch\_size} --- The number of samples we want to pass
+            into the training loop at each iteration.
+            \item \texttt{shuffle} --- Set to \texttt{True} if we want to
+            shuffle the data at every epoch.
+            \item \texttt{collate\_fn} --- The function used to collate the
+            samples into a batch. In this case, we are passing
+            \texttt{SST2Dataset.collate\_fn} as our function, which does the
+            tokenization and returns a dictionary of tensors for the input
+            sequences and the labels.
+            \item \texttt{num\_workers} --- The number of parallel subprocesses
+            we want to use when we're loading all data. This just speeds up the
+            data loading process.
+        \end{itemize}
         
-        \item[\textbf{Q2.3:}] Write the \textbf{type} and \textbf{shape} (if the
-        type is tensor) of \texttt{input\_ids}, \texttt{attention\_mask}, and
-        \texttt{label\_encoding} in \texttt{batch} and explain \textbf{what
-        these elements represent}.
+        \item[\textbf{Q2.3:}] \textbf{Write the \textbf{type} and \textbf{shape}
+        (if the type is tensor) of \texttt{input\_ids},
+        \texttt{attention\_mask}, and \texttt{label\_encoding} in \texttt{batch}
+        and explain \textbf{what these elements represent}.}
+
+        All are tensors. Note that the batch size equals 64 and the sequence
+        length equals 45.
+
+        \begin{itemize}
+            \item \texttt{input\_ids} (shape: \texttt{[64, 45]}) --- Each number
+            in \texttt{input\_ids} is a token ID that corresponds to a
+            particular token in the tokenizer's vocabulary. The model uses these
+            IDs to look up the embedding for each token and process the input
+            sequence.
+            \item \texttt{attention\_mask} (shape: \texttt{[64, 45]}) --- The
+            attention mask designates which tokens are actual tokens versus
+            padding tokens in \texttt{input\_ids}. A value of 1 indicates a real
+            token, and 0 indicates a padding token. This mask makes sure that
+            the model does not attend to padding positions when processing the
+            input.
+            \item \texttt{label\_encoding} (shape: \texttt{[64]}) --- This is
+            the label for each sequence in the batch. A value of 1 indicates a
+            positive sentiment, and 0 indicates a negative sentiment. These are
+            like the truth values we're trying to predict, which the model will
+            compare against its predictions to calculate the loss during
+            training.
+        \end{itemize}
+
     \end{itemize}
     
     \item[\textit{Step 3:}] \textit{Training and Evaluation}
 
     \begin{itemize}
-        \item[\textbf{Q3.1:}] For the three lines of code you implemented for
-        computing gradients and updating parameters using optimizer, explain
-        what each of the lines does, respectively.
+        \item[\textbf{Q3.1:}] \textbf{For the three lines of code you
+        implemented for computing gradients and updating parameters using
+        optimizer, explain what each of the lines does, respectively.}
+
+        \begin{enumerate}
+            \item \texttt{optimizer.zero\_grad()} --- This line clears the
+            gradients from the previous batch. This is because in PyTorch,
+            gradients are accumulated by default, so we need to clear them
+            because otherwise our gradients would mix across batches.
+
+            \item \texttt{loss.backward()} --- This line computes the gradient
+            of the loss with respect to all the parameters in the model
+            (technically, all the parameters that have
+            \texttt{requires\_grad=True}). This is just backpropagation.
+
+            \item \texttt{optimizer.step()} --- This line actually performs the
+            update based on the gradients we just computed in the last line. We
+            update the parameters by taking a step in the direction of the
+            negative gradient, scaled by the learning rate (direction of
+            steepest descent).
+        \end{enumerate}
         
-        \item[\textbf{Q3.2:}] Explain what setting the model to training and
-        evaluation modes do, respectively.
+        \item[\textbf{Q3.2:}] \textbf{Explain what setting the model to training
+        and evaluation modes do, respectively.}
         
-        \item[\textbf{Q3.3:}] Explain what \texttt{with torch.no\_grad()} does
-        in the \texttt{evaluation()} function.
+        It turns out there are some layers like \texttt{Dropout} and
+        \texttt{BatchNorm} that are used during training but not during
+        evaluation. For example, \texttt{Dropout} randomly zeroes some of the
+        input tensor elements with a probability of $p$ at each step during
+        training which apparently is effective for regularization. Batch
+        normalization uses batch statistics to normalize the input tensor, which
+        is also different between training and evaluation. So, setting the model
+        to training mode turns on these layers, and setting the model to
+        evaluation mode turns them off. Evaluation mode means the model behaves
+        more consistently, and we can use it to make predictions on new data.
+        
+        \item[\textbf{Q3.3:}] \textbf{Explain what \texttt{with
+        torch.no\_grad()} does in the \texttt{evaluation()} function.}
+
+        We don't need to compute gradients during evaluation because we're not
+        updating the model's parameters. Thus, if we want to save memory and
+        compute time, we can disable gradient computation, which is what
+        \texttt{torch.no\_grad()} does. It's specifically a context manager,
+        which allows the code inside the block to run without gradient
+        computation.
+
+        Read more: \texttt{https://realpython.com/python-with-statement/}
+
     \end{itemize}
 
-    
     \item[\textit{Step 4:}] \textit{Main Training Loop}
 
     \begin{itemize}
-        \item[\textbf{Q4.1:}] With the following default hyperparameters we
-        provide, plot both training and validation loss curves across 10 epochs
-        in a single plot ($x$-axis: num of the epoch; $y$-axis: acc). You can
-        draw this plot with a Python script or other visualization tools like
-        Google Sheets. (\texttt{batch\_size} = 64, \texttt{learning\_rate} =
-        5e-5, \texttt{num\_epochs} = 20, \texttt{model\_name} = "roberta-base")
+        \item[\textbf{Q4.1:}] \textbf{With the following default hyperparameters
+        we provide, plot both training and validation loss curves across 10
+        epochs in a single plot ($x$-axis: num of the epoch; $y$-axis: acc). You
+        can draw this plot with a Python script or other visualization tools
+        like Google Sheets. (\texttt{batch\_size = 64}, \texttt{learning\_rate =
+        5e-5}, \texttt{num\_epochs = 20}, \texttt{model\_name =
+        "roberta-base"})}
+
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=\textwidth]{plots/adamw.png}
+            \caption{Training and validation accuracies across 10 epochs with
+            optimizer \texttt{AdamW}, $\eta = 5 \cdot 10^{-5}$, and $\varepsilon
+            = 1 \cdot 10^{-8}$.}
+        \end{figure}
         
-        \item[\textbf{Q4.2:}] Describe the behaviors of the training and
+        
+        \item[\textbf{Q4.2:}] \textbf{Describe the behaviors of the training and
         validation loss curves you plotted above. At which epoch does the model
         achieve the best accuracy on the training dataset? What about the
         validation dataset? Do training and validation curves have the same
-        trend? Why does the current trend happen?
+        trend? Why does the current trend happen?}
+
+        The training accuracy starts off low and increases rapidly, while the
+        validation accuracy starts off high and doesn't really change much. The
+        model achieves the best accuracy on the training dataset in the
+        3rd-to-last epoch, however, the training accuracy in the last 3 epochs
+        was almost at 1.0 anyways.
+
+        The validation accuracy surprisingly was highest in the first epoch, and
+        it even decreased after that (although not by much).
+
+        The training and validation curves don't have the same trend. The
+        training accuracy increases rapidly, while the validation accuracy
+        doesn't really change much. This is likely because the model is
+        overfitting to the training data, which is why the training accuracy
+        keeps increasing while the validation accuracy doesn't. The model is
+        learning the training data too well, and it's not generalizing well to
+        the validation data.
         
-        \item[\textbf{Q4.3:}] Why do you shuffle the training data but not the
-        validation data?
+        \item[\textbf{Q4.3:}] \textbf{Why do you shuffle the training data but
+        not the validation data?}
+
+        We shuffle the training data because we want to randomize the order of
+        the training samples at the beginning of each epoch. This is important
+        because we want the model to learn to generalize well to the entire
+        training dataset, not just the order of the samples.
+
+        We don't shuffle the validation data because we don't need to. We're not
+        updating the model's parameters during validation, so the order of the
+        samples doesn't matter.
         
-        \item[\textbf{Q4.4:}] Explain the functionality of optimizers.
+        \item[\textbf{Q4.4:}] \textbf{Explain the functionality of optimizers.}
         
-        \item[\textbf{Q4.5:}] Experiment with two other optimizers defined in
-        \texttt{torch.optim} for the training the model with the default
-        hyperparameters we give you. What is the difference between
+        Optimizers are algorithms that are used to update the parameters of the
+        model based on the gradients of the loss function. They are used to
+        minimize the loss function by computing its gradient with respect to the
+        model's parameters and updating the parameters in the direction of the
+        negative gradient, scaled by the learning rate. This allows the
+        parameters to flow towards the minimum of the loss function, which is
+        where the model is most accurate.
+        
+        \item[\textbf{Q4.5:}] \textbf{Experiment with two other optimizers
+        defined in \texttt{torch.optim} for the training the model with the
+        default hyperparameters we give you. What is the difference between
         \texttt{AdamW} and these two new optimizers? Back up your claims with
-        empirical evidence.
+        empirical evidence.}
+
+        I experimented with \texttt{SGD} and \texttt{Adagrad}.
+
+        \begin{itemize}
+            \item \texttt{SGD} --- The training accuracy and evaluation accuracy
+            is much lower than with \texttt{AdamW}. It started out near 50\% for
+            both and didn't really change much! The model is not learning as
+            well with \texttt{SGD} as it is with \texttt{AdamW}. I did not
+            bother to plot the training and validation accuracies across 10
+            epochs with \texttt{SGD} because it was bad and didn't change much.
+
+            \item \texttt{Adagrad} --- With \texttt{Adagrad}, the training and
+            validation accuracy were actually \textit{higher} than with
+            \texttt{AdamW}. The training accuracy started out above 87\% and
+            climbed to 98\% by the end, while the validation accuracy started
+            out at 91\% or so and even got to 93\% by the end!
+        \end{itemize}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=\textwidth]{plots/adagrad.png}
+            \caption{Training and validation accuracies across 10 epochs with
+            optimizer \texttt{Adagrad}, $\eta = 5 \cdot 10^{-5}$, and
+            $\varepsilon = 1 \cdot 10^{-8}$.}
+        \end{figure}
         
-        \item[\textbf{Q4.6:}] Experiment with different combinations of
+        \item[\textbf{Q4.6:}] \textbf{Experiment with different combinations of
         \texttt{batch\_size}, \texttt{learning\_rate}, and \texttt{num\_epochs}.
         Your goal is to pick the final, best model checkpoint based on the
         validation dataset accuracy. Describe the strategy you used to try
         different combinations of hyperparameters. Why did you use this
-        strategy?
+        strategy?}
+
+        I tried different combinations of \texttt{batch\_size},
+        \texttt{learning\_rate}, and \texttt{num\_epochs} by using a grid
+        search. I tried a few different values for each hyperparameter and
+        trained the model with each combination. I then picked the combination
+        that gave the highest validation accuracy.
+
+        I used this strategy because it's a simple and systematic way to try
+        different combinations of hyperparameters. I wanted to make sure I
+        didn't miss any good combination. A grid search is a good way to do this
+        because it's easy to implement and it's easy to understand.
         
-        \item[\textbf{Q4.7:}] What are the \texttt{batch\_size},
+        \item[\textbf{Q4.7:}] \textbf{What are the \texttt{batch\_size},
         \texttt{learning\_rate}, and \texttt{num\_epochs} of the best model
         checkpoint that you picked? What are the training accuracy and
-        validation accuracy?
+        validation accuracy?}
+
+        The best configuration of hyperparameters I found was:
+        \begin{itemize}
+            \item \texttt{batch\_size} = 64
+            \item \texttt{learning\_rate} = $2 \cdot 10^{-6}$
+            \item \texttt{num\_epochs} = 10
+        \end{itemize}
+
     \end{itemize}
-    
+
     \item[\textit{Step 5:}] \textit{Testing the Final Model}
     \begin{itemize}
-        \item[\textbf{Q5.1:}] What's the test set accuracy of the best model?
+        \item[\textbf{Q5.1:}] \textbf{What's the test set accuracy of the best
+        model?}
+
+        The test set accuracy I got on my best model was
+        $\boxed{0.9330038440417353}$.
     \end{itemize}
     
 \end{itemize}

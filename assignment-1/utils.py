@@ -35,8 +35,7 @@ def produce_scatterplot(
     y_label: str,
     file_name: str,
 ) -> None:
-    # Call this function after your training loop, using the lists you
-    # populated
+    # Call this function after your training loop, using the lists you populated
     save_to_csv(vocabulary_sizes, corpus_lengths)
 
     # Plot the scatterplot after training
